@@ -1,14 +1,16 @@
 package main
+
 import (
-"bufio"
-"flag"
-"fmt"
-"io"
-"log"
-"net/http"
-"os"
-"strings"
-"sync"
+	"bufio"
+	"flag"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+	"sync"
+	"time"
 )
 
 /*
@@ -21,7 +23,11 @@ Wordpress: /wp-includes/css/buttons.css ---> 'WordPress-style Buttons'
 Joomla: /media/system/js/core.js ---> 'window.Joomla' */
 
 func check_url(input_url string) string {
-        resp, err := http.Get(input_url)
+    client := http.Client{
+        Timeout: 5 * time.Second,
+    }
+
+    resp, err := client.Get(input_url)
     if err == nil {
         defer resp.Body.Close()
                 body := new(strings.Builder)
@@ -43,7 +49,7 @@ func check_url(input_url string) string {
                         }
                 }
 
-                resp, err := http.Get(input_url + "/wp-includes/css/buttons.css")
+                resp, err := client.Get(input_url + "wp-includes/css/buttons.css")
                 if err == nil {
                         defer resp.Body.Close()
             body := new(strings.Builder)
@@ -53,7 +59,7 @@ func check_url(input_url string) string {
                                 return "Wordpress"
                         }
                 }
-                resp, err = http.Get(input_url + "/media/system/js/core.js")
+                resp, err = client.Get(input_url + "media/system/js/core.js")
         if
                 err == nil {
                         defer resp.Body.Close()
@@ -69,12 +75,20 @@ func check_url(input_url string) string {
 }
 func check_url_chunk(chunk chan string) {
     for url := range chunk {
+        if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+            url = "http://" + url
+        }
+    
+        if !strings.HasSuffix(url, "/") {
+            url = url + "/"
+        }
+
         result := check_url(url)
         if result != "Invalid" {
             append_to_file("cmslookup_" + result + ".txt", url + "\n")
-                        fmt.Printf("[✓] %v: %v\n", url, result)
-                }
+            fmt.Printf("[✓] %v: %v\n", url, result)
         }
+    }
 }
 func read_urls(file_name string) []string {
     file, err := os.Open(file_name)
